@@ -1,9 +1,14 @@
 import os
 import logging
 import asyncio
-from fastapi import FastAPI, Request, Response
-from pywa import WhatsApp
-from pywa.types import Message, CallbackButton
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from pywa_async import WhatsApp
+from pywa.types import Message, CallbackButton, Button
+from pywa import filters
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,12 +36,12 @@ async def start_handler(client: WhatsApp, msg: Message):
     await msg.reply(f"Hi there {msg.from_user.name}!")
     
     buttons = [
-        CallbackButton(title="Yes", callback_data="one"),
-        CallbackButton(title="No", callback_data="two"),
+        Button(title="Yes", callback_data="one"),
+        Button(title="No", callback_data="two"),
     ]
     await msg.reply("Choose an option:", buttons=buttons)
 
-@wa.on_callback_button(lambda _, btn: btn.data == "two")
+@wa.on_callback_button(filters.matches("two"))
 async def handle_no(client: WhatsApp, btn: CallbackButton):
     sender = btn.from_user.wa_id
     
@@ -44,7 +49,7 @@ async def handle_no(client: WhatsApp, btn: CallbackButton):
     await btn.mark_as_read()
     await asyncio.sleep(1) # Simulated typing delay
     await btn.reply("This is second mate")
-    await client.send_reaction(message_id=btn.id, emoji="😂")
+    await btn.react("😂")
 
 # FastAPI health check
 @app.get("/")
