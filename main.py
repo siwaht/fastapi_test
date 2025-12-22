@@ -1,9 +1,9 @@
 import os
-import requests
+import httpx
 import logging
 from typing import Annotated
 from typing_extensions import TypedDict
-from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, Query
 from langchain_openai import ChatOpenAI
@@ -11,14 +11,24 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
 # 1. SETUP & CONFIG
-load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+# HTTP client for WhatsApp API
+http_client: httpx.AsyncClient = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage HTTP client lifecycle."""
+    global http_client
+    http_client = httpx.AsyncClient(timeout=30.0)
+    yield
+    await http_client.aclose()
+
+app = FastAPI(lifespan=lifespan)
 
 # 2. WHATSAPP SENDER TOOL
-def send_whatsapp_text(recipient_id: str, message_text: str):
+async def send_whatsapp_text(recipient_id: str, message_text: str):
     """Sends a message via WhatsApp Cloud API."""
     url = f"https://graph.facebook.com/v21.0/{os.getenv('WA_PHONE_ID')}/messages"
     headers = {
@@ -31,26 +41,20 @@ def send_whatsapp_text(recipient_id: str, message_text: str):
         "type": "text",
         "text": {"body": message_text}
     }
-    response = requests.post(url, headers=headers, json=payload)
+    response = await http_client.post(url, headers=headers, json=payload)
     return response.json()
 
 # 3. LANGGRAPH AGENT LOGIC
 class State(TypedDict):
-    # add_messages ensures chat history is appended correctly
     messages: Annotated[list, add_messages]
     sender_id: str
 
 llm = ChatOpenAI(model="gpt-4o-mini")
 
 def chatbot_node(state: State):
-    """The brain of the bot: generates a response and sends it."""
-    # Call LLM to get a friendly response
+    """The brain of the bot: generates a response."""
     response = llm.invoke(state["messages"])
-    
-    # Send the response back to WhatsApp
-    send_whatsapp_text(state["sender_id"], response.content)
-    
-    return {"messages": [response]}
+    return {"messages": [response], "response_text": response.content}
 
 # Define the Graph
 workflow = StateGraph(State)
@@ -94,10 +98,14 @@ async def handle_incoming_message(request: Request):
             logger.info(f"Received message from {user_name}: {message_body}")
 
             # Trigger the Agent
-            agent.invoke({
+            result = agent.invoke({
                 "messages": [("human", message_body)],
                 "sender_id": sender_id
             })
+            
+            # Send response back to WhatsApp
+            response_text = result["messages"][-1].content
+            await send_whatsapp_text(sender_id, response_text)
 
     except Exception as e:
         logger.error(f"Webhook error: {e}")

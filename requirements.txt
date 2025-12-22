@@ -1,7 +1,6 @@
-fastapi
-uvicorn
+fastapi[standard]
+uvicorn[standard]
 python-dotenv
-requests
+httpx
 langchain-openai
 langgraph
-typing-extensions
