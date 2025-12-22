@@ -4,3 +4,4 @@ python-dotenv
 requests
 langchain-openai
 langgraph
+typing-extensions
