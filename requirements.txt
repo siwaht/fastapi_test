@@ -1,6 +1,6 @@
-fastapi[standard]
-uvicorn[standard]
+fastapi
+uvicorn
 python-dotenv
-httpx
+langchain
 langchain-openai
-langgraph
+twilio

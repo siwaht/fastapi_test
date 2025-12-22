@@ -1,117 +1,66 @@
 import os
-import httpx
-import logging
-from typing import Annotated
-from typing_extensions import TypedDict
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, Form, Response
+from twilio.twiml.messaging_response import MessagingResponse
+from langchain.agents import create_agent
+from dotenv import load_dotenv
 
-from fastapi import FastAPI, Request, Response, Query
-from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
+# Load environment variables
+load_dotenv()
 
-# 1. SETUP & CONFIG
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI()
 
-# HTTP client for WhatsApp API
-http_client: httpx.AsyncClient = None
+# Define tools for the agent (add your custom tools here)
+def get_current_time() -> str:
+    """Get the current date and time."""
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage HTTP client lifecycle."""
-    global http_client
-    http_client = httpx.AsyncClient(timeout=30.0)
-    yield
-    await http_client.aclose()
-
-app = FastAPI(lifespan=lifespan)
-
-# 2. WHATSAPP SENDER TOOL
-async def send_whatsapp_text(recipient_id: str, message_text: str):
-    """Sends a message via WhatsApp Cloud API."""
-    url = f"https://graph.facebook.com/v21.0/{os.getenv('WA_PHONE_ID')}/messages"
-    headers = {
-        "Authorization": f"Bearer {os.getenv('WA_TOKEN')}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_id,
-        "type": "text",
-        "text": {"body": message_text}
-    }
-    response = await http_client.post(url, headers=headers, json=payload)
-    return response.json()
-
-# 3. LANGGRAPH AGENT LOGIC
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
-    sender_id: str
-
-llm = ChatOpenAI(model="gpt-4o-mini")
-
-def chatbot_node(state: State):
-    """The brain of the bot: generates a response."""
-    response = llm.invoke(state["messages"])
-    return {"messages": [response], "response_text": response.content}
-
-# Define the Graph
-workflow = StateGraph(State)
-workflow.add_node("chatbot", chatbot_node)
-workflow.add_edge(START, "chatbot")
-workflow.add_edge("chatbot", END)
-
-# Compile the agent
-agent = workflow.compile()
-
-# 4. FASTAPI WEBHOOK ROUTES
-@app.get("/webhook")
-async def verify_handshake(
-    token: str = Query(..., alias="hub.verify_token"), 
-    challenge: str = Query(..., alias="hub.challenge")
-):
-    """Verifies the webhook connection with Meta."""
-    if token == os.getenv("WA_VERIFY_TOKEN"):
-        return Response(content=challenge, media_type="text/plain")
-    return Response(content="Invalid token", status_code=403)
-
-@app.post("/webhook")
-async def handle_incoming_message(request: Request):
-    """Receives user messages and triggers the LangGraph agent."""
-    data = await request.json()
-    
+def calculate(expression: str) -> str:
+    """Evaluate a math expression. Example: '2 + 2' or '10 * 5'"""
     try:
-        # Navigate Meta's JSON structure
-        entry = data.get('entry', [{}])[0]
-        changes = entry.get('changes', [{}])[0]
-        value = changes.get('value', {})
-        
-        if "messages" in value:
-            message = value['messages'][0]
-            sender_id = message['from']
-            user_name = value.get('contacts', [{}])[0].get('profile', {}).get('name', 'User')
-            
-            # Get text or default if it's media
-            message_body = message.get('text', {}).get('body', "[Media/Other Message]")
-
-            logger.info(f"Received message from {user_name}: {message_body}")
-
-            # Trigger the Agent
-            result = agent.invoke({
-                "messages": [("human", message_body)],
-                "sender_id": sender_id
-            })
-            
-            # Send response back to WhatsApp
-            response_text = result["messages"][-1].content
-            await send_whatsapp_text(sender_id, response_text)
-
+        result = eval(expression)
+        return str(result)
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        return f"Error: {e}"
 
-    return {"status": "success"}
+# Create the agent (LangChain v1 style)
+agent = create_agent(
+    model="gpt-4o-mini",
+    tools=[get_current_time, calculate],
+    system_prompt="You are a helpful WhatsApp assistant. Be concise and friendly.",
+)
+
+# Simple in-memory conversation history per user
+conversations: dict[str, list] = {}
+
+@app.post("/whatsapp")
+async def whatsapp_webhook(Body: str = Form(...), From: str = Form(...)):
+    """
+    Twilio webhook endpoint for incoming WhatsApp messages.
+    """
+    # Get or create conversation for this user
+    if From not in conversations:
+        conversations[From] = []
+    
+    # Add user message to history
+    conversations[From].append({"role": "user", "content": Body})
+    
+    # Invoke the agent
+    response = agent.invoke({"messages": conversations[From]})
+    
+    # Get the last AI message
+    ai_message = response["messages"][-1].content
+    
+    # Add AI response to history
+    conversations[From].append({"role": "assistant", "content": ai_message})
+    
+    # Return TwiML response
+    resp = MessagingResponse()
+    resp.message(ai_message)
+    
+    return Response(content=str(resp), media_type="application/xml")
+
 
 @app.get("/")
 async def root():
-    return {"status": "online", "framework": "FastAPI + LangGraph"}
+    return {"status": "running"}
