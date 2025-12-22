@@ -1,4 +1,6 @@
 fastapi
 uvicorn
-pywa
 python-dotenv
+requests
+langchain-openai
+langgraph
