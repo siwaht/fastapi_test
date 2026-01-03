@@ -8,15 +8,24 @@ load_dotenv()
 
 app = FastAPI()
 
-print(f"Phone ID: {os.getenv('WHATSAPP_PHONE_ID')}")
-print(f"Token exists: {bool(os.getenv('WHATSAPP_TOKEN'))}")
-print(f"Verify token: {os.getenv('WHATSAPP_VERIFY_TOKEN', '123')}")
+# Get environment variables
+phone_id = os.getenv("WHATSAPP_PHONE_ID")
+token = os.getenv("WHATSAPP_TOKEN")
+verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "change-me")
+app_secret = os.getenv("WHATSAPP_APP_SECRET")  # Optional: for signature validation
 
+# Validate required environment variables
+if not phone_id or not token:
+    raise ValueError("WHATSAPP_PHONE_ID and WHATSAPP_TOKEN must be set")
+
+# Initialize WhatsApp client
 wa = WhatsApp(
-    phone_id=os.getenv("WHATSAPP_PHONE_ID"),
-    token=os.getenv("WHATSAPP_TOKEN"),
+    phone_id=phone_id,
+    token=token,
     server=app,
-    verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", "123"),
+    verify_token=verify_token,
+    app_secret=app_secret,  # Set to None if not provided (signature validation disabled)
+    validate_updates=bool(app_secret),  # Only validate if app_secret is provided
 )
 
 @wa.on_message(filters.text)
@@ -33,6 +42,3 @@ def root():
 def health():
     return {"status": "ok"}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8001)))

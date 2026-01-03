@@ -248,6 +248,7 @@ dependencies = [
     { name = "langchain-openai" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
+    { name = "pywa" },
     { name = "twilio" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -260,6 +261,7 @@ requires-dist = [
     { name = "langchain-openai", specifier = ">=0.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-multipart", specifier = ">=0.0.6" },
+    { name = "pywa", specifier = ">=3.6.1" },
     { name = "twilio", specifier = ">=8.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.23.0" },
 ]
@@ -937,6 +939,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/78/96/804520d0850c7db98e5ccb70282e29208723f0964e88ffd9d0da2f52ea09/python_multipart-0.0.21.tar.gz", hash = "sha256:7137ebd4d3bbf70ea1622998f902b97a29434a9e8dc40eb203bbcf7c2a2cba92", size = 37196, upload-time = "2025-12-17T09:24:22.446Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/aa/76/03af049af4dcee5d27442f71b6924f01f3efb5d2bd34f23fcd563f2cc5f5/python_multipart-0.0.21-py3-none-any.whl", hash = "sha256:cf7a6713e01c87aa35387f4774e812c4361150938d20d232800f75ffcf266090", size = 24541, upload-time = "2025-12-17T09:24:21.153Z" },
+]
+
+[[package]]
+name = "pywa"
+version = "3.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e2/bf/06559138b25faeabb890a5720f65f61900b0d6fe636bc517a7cdf3fa9809/pywa-3.6.1.tar.gz", hash = "sha256:2421a31ceafc55561059b79fd67621d6560762a7690a34b30cbbaa1460da25b7", size = 306899, upload-time = "2025-12-10T22:12:57.087Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e7/92/a4eb0b6477add871ee58f6714ef3e8c3cef2156801fabfae43b3c4391996/pywa-3.6.1-py3-none-any.whl", hash = "sha256:ec2a047970657c171f89d81c52ccffdd8d36a9289c3aace414afb61976a254a5", size = 298994, upload-time = "2025-12-10T22:12:55.366Z" },
 ]
 
 [[package]]

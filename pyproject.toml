@@ -11,6 +11,7 @@ dependencies = [
     "langchain-openai>=0.1.0",
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.6",
+    "pywa>=3.6.1",
     "twilio>=8.0.0",
     "uvicorn[standard]>=0.23.0",
 ]
