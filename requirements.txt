@@ -1,8 +1,4 @@
-fastapi>=0.100.0
-uvicorn[standard]>=0.23.0
-langchain>=1
-python-dotenv>=1.0.0
-langchain-core>=0.2.0
-langchain-openai>=0.1.0
-twilio>=8.0.0
-python-multipart>=0.0.6
+fastapi
+uvicorn[standard]
+langchain-openai
+python-dotenv

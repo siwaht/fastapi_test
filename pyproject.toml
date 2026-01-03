@@ -1,0 +1,16 @@
+[project]
+name = "fastapi-test"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.100.0",
+    "langchain>=1",
+    "langchain-core>=0.2.0",
+    "langchain-openai>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "python-multipart>=0.0.6",
+    "twilio>=8.0.0",
+    "uvicorn[standard]>=0.23.0",
+]
