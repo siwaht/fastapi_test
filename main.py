@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
@@ -53,14 +54,30 @@ When asked for menus (e.g., real estate bot), choose element type based on optio
 """
 
 app = FastAPI()
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-agent = create_agent(llm, tools=[], system_prompt=SYSTEM_PROMPT)
+
+# Lazy initialization to avoid blocking startup
+_llm = None
+_agent = None
+
+def get_agent():
+    """Lazy initialization of agent to avoid blocking startup"""
+    global _llm, _agent
+    if _agent is None:
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+        _llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        _agent = create_agent(_llm, tools=[], system_prompt=SYSTEM_PROMPT)
+    return _agent
 
 @app.post("/chat")
 async def chat(message: str):
-    result = await agent.ainvoke({"messages": [HumanMessage(content=message)]})
-    reply = result["messages"][-1].content
-    return {"response": reply}
+    try:
+        agent = get_agent()
+        result = await agent.ainvoke({"messages": [HumanMessage(content=message)]})
+        reply = result["messages"][-1].content
+        return {"response": reply}
+    except Exception as e:
+        return {"error": str(e), "response": "Sorry, I encountered an error processing your message."}
 
 @app.get("/health")
 def health():
