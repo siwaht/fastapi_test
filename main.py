@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, Form, Response
 from twilio.twiml.messaging_response import MessagingResponse
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage 
+from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,7 +15,8 @@ if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable is not set. Please set it in Railway environment variables.")
 
 # Initialize the LangChain LLM
-llm = ChatOpenAI(model="gpt-4o", api_key=OPENAI_API_KEY)
+# ChatOpenAI automatically reads OPENAI_API_KEY from environment variables
+llm = ChatOpenAI(model="gpt-4o")
 
 @app.get("/")
 async def root():
@@ -43,10 +44,10 @@ async def whatsapp_reply(Body: str = Form(...), From: str = Form(...)):
         twilio_resp = MessagingResponse()
         twilio_resp.message(ai_text)
 
-        # 3. Return as XML with the correct header
+        # 3. Return as XML with the correct header (text/xml per Twilio docs)
         return Response(
-            content=str(twilio_resp), 
-            media_type="application/xml"
+            content=str(twilio_resp),
+            media_type="text/xml"
         )
     except Exception as e:
         # Log error and return a safe TwiML response
@@ -55,7 +56,7 @@ async def whatsapp_reply(Body: str = Form(...), From: str = Form(...)):
         twilio_resp.message("Sorry, I encountered an error processing your message. Please try again.")
         return Response(
             content=str(twilio_resp),
-            media_type="application/xml"
+            media_type="text/xml"
         )
 
 if __name__ == "__main__":
