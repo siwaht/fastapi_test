@@ -3,3 +3,4 @@ uvicorn[standard]>=0.23.0
 langchain>=1
 langchain-openai>=0.1.0
 python-dotenv>=1.0.0
+twilio>=8.0.0
