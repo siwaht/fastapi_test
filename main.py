@@ -1,10 +1,14 @@
 import os
 import requests
-from fastapi import FastAPI, Request, Response, Query
+import logging
+from fastapi import FastAPI, Request, Response, Query, HTTPException
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
+from langchain.memory import ConversationBufferMemory
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
@@ -58,19 +62,23 @@ app = FastAPI()
 
 VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "change-me")
 
+# Store conversation memory per user
+user_memories = {}
+
 # Lazy initialization to avoid blocking startup
 _llm = None
-_agent = None
 
-def get_agent():
-    """Lazy initialization of agent to avoid blocking startup"""
-    global _llm, _agent
-    if _agent is None:
+def get_agent(wa_id: str):
+    """Get or create agent with per-user memory"""
+    global _llm
+    if _llm is None:
         if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY environment variable is not set")
         _llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        _agent = create_agent(_llm, tools=[], system_prompt=SYSTEM_PROMPT)
-    return _agent
+    
+    # Create agent with memory for this user
+    agent = create_agent(_llm, tools=[], system_prompt=SYSTEM_PROMPT)
+    return agent
 
 @app.get("/whatsapp/webhook")
 def verify(
@@ -78,13 +86,15 @@ def verify(
     hub_challenge: str = Query(None, alias="hub.challenge"),
     hub_verify_token: str = Query(None, alias="hub.verify_token"),
 ):
+    logging.info(f"Webhook verify: mode={hub_mode}, token_match={hub_verify_token==VERIFY_TOKEN}")
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return Response(content=hub_challenge or "", media_type="text/plain")
-    return Response(status_code=403)
+        return int(hub_challenge or 0)  # Meta expects integer
+    raise HTTPException(status_code=403, detail="Forbidden")
 
 @app.post("/whatsapp/webhook")
 async def whatsapp_webhook(req: Request):
     body = await req.json()
+    logging.info(f"Webhook POST: {body}")
     try:
         changes = body.get("entry", [{}])[0].get("changes", [{}])
         value = changes[0].get("value", {})
@@ -98,13 +108,16 @@ async def whatsapp_webhook(req: Request):
         if not (wa_id and user_text):
             return {"status": "ok"}
 
-        agent = get_agent()
+        logging.info(f"User {wa_id}: {user_text}")
+        
+        agent = get_agent(wa_id)
         result = await agent.ainvoke({"messages": [HumanMessage(content=user_text)]})
         reply_text = result["messages"][-1].content
 
+        logging.info(f"Agent reply: {reply_text}")
         send_whatsapp_text(wa_id, reply_text)
     except Exception as e:
-        # In production, log e
+        logging.error(f"Webhook error: {e}", exc_info=True)
         return {"status": "error", "detail": str(e)}
     return {"status": "ok"}
 
