@@ -1,6 +1,6 @@
 import os
 import requests
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Query
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
@@ -73,26 +73,39 @@ def get_agent():
     return _agent
 
 @app.get("/whatsapp/webhook")
-def verify(mode: str = None, hub_challenge: str = None, hub_verify_token: str = None):
-    if mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return Response(content=hub_challenge, media_type="text/plain")
+def verify(
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_challenge: str = Query(None, alias="hub.challenge"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token"),
+):
+    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        return Response(content=hub_challenge or "", media_type="text/plain")
     return Response(status_code=403)
 
 @app.post("/whatsapp/webhook")
 async def whatsapp_webhook(req: Request):
     body = await req.json()
     try:
-        entry = body["entry"][0]["changes"][0]["value"]["messages"][0]
-        user_text = entry["text"]["body"]
-        wa_id = entry["from"]
+        changes = body.get("entry", [{}])[0].get("changes", [{}])
+        value = changes[0].get("value", {})
+        messages = value.get("messages", [])
+        if not messages:
+            return {"status": "ok"}  # ignore non-message webhooks
+
+        entry = messages[0]
+        wa_id = entry.get("from")
+        user_text = entry.get("text", {}).get("body")
+        if not (wa_id and user_text):
+            return {"status": "ok"}
 
         agent = get_agent()
         result = await agent.ainvoke({"messages": [HumanMessage(content=user_text)]})
         reply_text = result["messages"][-1].content
 
         send_whatsapp_text(wa_id, reply_text)
-    except Exception:
-        pass
+    except Exception as e:
+        # In production, log e
+        return {"status": "error", "detail": str(e)}
     return {"status": "ok"}
 
 @app.get("/health")
@@ -116,3 +129,8 @@ def send_whatsapp_text(to_number: str, text: str):
         "text": {"body": text}
     }
     requests.post(url, headers=headers, json=payload, timeout=10)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8001)))
