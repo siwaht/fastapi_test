@@ -1,5 +1,6 @@
 import os
-from fastapi import FastAPI
+import requests
+from fastapi import FastAPI, Request, Response
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
@@ -55,6 +56,8 @@ When asked for menus (e.g., real estate bot), choose element type based on optio
 
 app = FastAPI()
 
+VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "change-me")
+
 # Lazy initialization to avoid blocking startup
 _llm = None
 _agent = None
@@ -69,21 +72,47 @@ def get_agent():
         _agent = create_agent(_llm, tools=[], system_prompt=SYSTEM_PROMPT)
     return _agent
 
-@app.post("/chat")
-async def chat(message: str):
+@app.get("/whatsapp/webhook")
+def verify(mode: str = None, hub_challenge: str = None, hub_verify_token: str = None):
+    if mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        return Response(content=hub_challenge, media_type="text/plain")
+    return Response(status_code=403)
+
+@app.post("/whatsapp/webhook")
+async def whatsapp_webhook(req: Request):
+    body = await req.json()
     try:
+        entry = body["entry"][0]["changes"][0]["value"]["messages"][0]
+        user_text = entry["text"]["body"]
+        wa_id = entry["from"]
+
         agent = get_agent()
-        result = await agent.ainvoke({"messages": [HumanMessage(content=message)]})
-        reply = result["messages"][-1].content
-        return {"response": reply}
-    except Exception as e:
-        return {"error": str(e), "response": "Sorry, I encountered an error processing your message."}
+        result = await agent.ainvoke({"messages": [HumanMessage(content=user_text)]})
+        reply_text = result["messages"][-1].content
+
+        send_whatsapp_text(wa_id, reply_text)
+    except Exception:
+        pass
+    return {"status": "ok"}
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "WhatsApp Cloud API bot is running"}
 
+def send_whatsapp_text(to_number: str, text: str):
+    url = f"https://graph.facebook.com/v19.0/{os.getenv('WHATSAPP_PHONE_ID')}/messages"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('WHATSAPP_TOKEN')}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_number,
+        "type": "text",
+        "text": {"body": text}
+    }
+    requests.post(url, headers=headers, json=payload, timeout=10)
