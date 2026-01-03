@@ -8,6 +8,10 @@ load_dotenv()
 
 app = FastAPI()
 
+print(f"Phone ID: {os.getenv('WHATSAPP_PHONE_ID')}")
+print(f"Token exists: {bool(os.getenv('WHATSAPP_TOKEN'))}")
+print(f"Verify token: {os.getenv('WHATSAPP_VERIFY_TOKEN', '123')}")
+
 wa = WhatsApp(
     phone_id=os.getenv("WHATSAPP_PHONE_ID"),
     token=os.getenv("WHATSAPP_TOKEN"),
