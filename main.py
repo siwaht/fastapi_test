@@ -1,8 +1,12 @@
 import os
+import logging
 from fastapi import FastAPI
 from pywa import WhatsApp, filters
 from pywa.types import Message
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -28,11 +32,21 @@ wa = WhatsApp(
     validate_updates=bool(app_secret),  # Only validate if app_secret is provided
 )
 
+@wa.on_raw_update()
+def raw_update_handler(client: WhatsApp, update: dict):
+    """Debug: log all incoming updates"""
+    logger.info(f"Raw update received: {update}")
+
 @wa.on_message(filters.text)
 def greet_handler(client: WhatsApp, msg: Message):
     """Simple greeting bot"""
-    msg.react("👋")
-    msg.reply_text(f"Hi {msg.from_user.name}! How are you?")
+    logger.info(f"Received message from {msg.from_user.name}: {msg.text}")
+    try:
+        msg.react("👋")
+        msg.reply_text(f"Hi {msg.from_user.name}! How are you?")
+        logger.info(f"Sent reply to {msg.from_user.name}")
+    except Exception as e:
+        logger.error(f"Error handling message: {e}")
 
 @app.get("/")
 def root():
