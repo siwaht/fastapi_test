@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (will be passed via environment variables)
+.env
+.env.local
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Testing
+test_*.py
+*_test.py
+tests/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Lock files (not needed in container)
+uv.lock
+pyproject.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
