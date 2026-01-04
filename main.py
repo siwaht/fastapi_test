@@ -1,8 +1,8 @@
-from pywa import WhatsApp
-from pywa.types import Message, CallbackButton, CallbackSelection
+from pywa import WhatsApp, filters
+from pywa.types import Message, CallbackButton
 import logging
 import os
-import asyncio
+import time
 
 # Global dictionary to store user state
 sessions = {}
@@ -18,41 +18,37 @@ wa = WhatsApp(
 )
 
 @wa.on_message()
-async def bot_started_handler(client, message: Message):
+def bot_started_handler(client, message: Message):
     """Handle trigger_start trigger."""
     sender = message.from_user.wa_id
-    if sender not in sessions: sessions[sender] = {}
-    user_data = sessions[sender]
+    if sender not in sessions: 
+        sessions[sender] = {}
 
     # [NODE:2] Welcome Message
     # Show typing indicator
-    await asyncio.sleep(3)
-    await client.send_message(sender, f"HI there {message.from_user.name}")
+    time.sleep(3)
+    message.reply_text(f"Hi there {message.from_user.name}")
     # [NODE:node_1767525333911] New inlinebuttons
     buttons = [
         CallbackButton(title="yes", callback_data="yes"),
         CallbackButton(title="no", callback_data="no"),
     ]
-    await client.send_message(sender, "Choose an option:", buttons=buttons)
+    message.reply_text("Choose an option:", buttons=buttons)
 
 # Grouped handler for node node_1767525333911 buttons: no, yes
-@wa.on_callback_button(matches=["no","yes"])
-async def handle_callbacks_node_1767525333911(client, message: CallbackButton):
-    sender = message.from_user.wa_id
-    if sender not in sessions: sessions[sender] = {}
-    user_data = sessions[sender]
+@wa.on_callback_button(filters.matches("no", "yes"))
+def handle_callbacks_node_1767525333911(client, clb: CallbackButton):
+    sender = clb.from_user.wa_id
+    if sender not in sessions: 
+        sessions[sender] = {}
 
-    if message.data == "no":
+    if clb.data == "no":
         # [NODE:node_1767526623597] no
         # Show typing indicator
-        await asyncio.sleep(3)
-        await client.send_message(sender, f"This is no {message.from_user.name}")
-    elif message.data == "yes":
+        time.sleep(3)
+        clb.reply_text(f"This is no {clb.from_user.name}")
+    elif clb.data == "yes":
         # [NODE:node_1767526607644] yes
         # Show typing indicator
-        await asyncio.sleep(3)
-        await client.send_message(sender, "This is yes")
-
-# Start the WhatsApp webhook server
-if __name__ == "__main__":
-    wa.run(host="0.0.0.0", port=8080)
+        time.sleep(3)
+        clb.reply_text("This is yes")
