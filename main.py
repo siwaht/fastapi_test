@@ -15,7 +15,7 @@ wa = WhatsApp(
     phone_id=os.getenv("WHATSAPP_PHONE_ID"),
     token=os.getenv("WHATSAPP_TOKEN"),
     server=app,
-    verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", "test"),
+    verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN")
 )
 
 @wa.on_message()
