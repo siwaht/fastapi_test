@@ -1,32 +1,36 @@
 from fastapi import FastAPI
 from pywa import WhatsApp
 from pywa.types import Message
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Create FastAPI app
 app = FastAPI()
 
-# WhatsApp configuration
 wa = WhatsApp(
     phone_id=os.getenv("WHATSAPP_PHONE_ID"),
     token=os.getenv("WHATSAPP_TOKEN"),
     server=app,
-    verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN")
+    verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", "change-me"),
+)
+
+model = init_chat_model("openai:gpt-4o-mini", temperature=0.7)
+
+agent = create_agent(
+    model=model,
+    system_prompt="You are a helpful AI assistant on WhatsApp. Keep responses concise.",
+    tools=[],
 )
 
 @wa.on_message()
-def greet(client, message: Message):
-    """Simple greeting handler."""
-    message.reply_text(f"Hi {message.from_user.name}! 👋")
+def handle_message(client, message: Message):
+    if message.text:
+        response = agent.invoke({"messages": [{"role": "user", "content": message.text}]})
+        message.reply_text(response["messages"][-1].content)
 
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "WhatsApp Bot is running"}
-
-@app.get("/health")
-def health():
     return {"status": "ok"}
